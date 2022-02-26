@@ -1,0 +1,227 @@
+---
+title: "The Bootstrap"
+author: "John Clements"
+date: "2/26/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# I. Introduction
+
+# II. Technical Implementation
+
+```{r}
+rand_vec <- rnorm(100, mean=0.05, sd=0.2)
+
+sharpe_ratio <- function(returns){
+  return(mean(returns)/sd(returns))
+}
+```
+
+## A. Single Bootstrap Function
+
+
+```{r}
+one_bootstrap <- function(my_vec, my_func){
+  ###
+  # This function retrieves one bootstrapped sample and returns the statistic
+  # of interest.
+  #
+  # Args
+  # ----
+  # my_vec : numeric vector
+  #   A vector of numbers of which to compute the statistic of interest.
+  # my_func : function
+  #   Function which computes the statistic of interest.
+  #
+  # Returns
+  # -------
+  # double
+  #   The statistic of interest computed on the bootstrapped sample.
+  #
+  ###
+  bootstrapped_sample <- sample(my_vec, size=length(my_vec), replace=TRUE)
+  return(my_func(bootstrapped_sample))
+}
+```
+
+## B. Bootstrap Loop
+
+```{r}
+bootstrap_loop <- function(my_vec, my_func, B){
+  ###
+  # This function takes in a data vector, function, and the number of bootstrap
+  # iterations and returns a list holding the mean and standard deviation of the 
+  # bootstrap estimates as well, as the vector of the bootstrap estimates. It
+  # utilizes a for loop.
+  #
+  # Args
+  # ----
+  # my_vec : numeric vector
+  #   A vector of numbers of which to compute the statistic of interest.
+  # my_func : function
+  #   Function which computes the statistic of interest.
+  # B : int
+  #   The number of bootstrapped samples to return.
+  #
+  # Returns
+  # -------
+  # output : list
+  #   A list of the mean, and standard deviation of the estimates and a vector
+  #   of the estimates.
+  #
+  ###
+  estimates <- rep(NA, B)
+  for (i in 1:B){
+    estimates[i] <- one_bootstrap(my_vec, my_func)
+  }
+  output <- list(
+    'mean' = mean(estimates),
+    'std' = sd(estimates),
+    'estimates' = estimates
+  )
+  return(output)
+}
+```
+
+## C. Bootstrap Replicate
+
+```{r}
+bootstrap_replicate <- function(my_vec, my_func, B){
+  ###
+  # This function takes in a data vector, function, and the number of bootstrap
+  # iterations and returns a list holding the mean and standard deviation of the 
+  # bootstrap estimates as well, as the vector of the bootstrap estimates. It
+  # utilizes the replicate function for optimized looping.
+  #
+  # Args
+  # ----
+  # my_vec : numeric vector
+  #   A vector of numbers of which to compute the statistic of interest.
+  # my_func : function
+  #   Function which computes the statistic of interest.
+  # B : int
+  #   The number of bootstrapped samples to return.
+  #
+  # Returns
+  # -------
+  # output : list
+  #   A list of the mean, and standard deviation of the estimates and a vector
+  #   of the estimates.
+  #
+  ###
+  estimates <- replicate(B, one_bootstrap(my_vec, my_func))
+  output <- list(
+    'mean' = mean(estimates),
+    'std' = sd(estimates),
+    'estimates' = estimates
+  )
+  return(output)
+}
+```
+
+## D. Parallelized Bootstrapping
+
+```{r}
+library(parallel)
+```
+
+
+```{r}
+bootstrap_replicate_par <- function(B, my_vec, my_func){
+  ###
+  # This function is a helper function for the parallized bootstrapping function.
+  # It takes in a vector whose length determines the number of bootstrap samples
+  # to take, a data vector, and a function. It returns the list of bootstrapped
+  # estimates from my_func.
+  #
+  # Args
+  # ----
+  # B : vecot
+  #   A vector whose length determines of bootstrapped samples to return.
+  # my_vec : numeric vector
+  #   A vector of numbers of which to compute the statistic of interest.
+  # my_func : function
+  #   Function which computes the statistic of interest.
+  #
+  # Returns
+  # -------
+  # estimates : vector
+  #   A vector of the estimates.
+  #
+  ###
+  estimates <- replicate(length(B), one_bootstrap(my_vec, my_func))
+  return(estimates)
+}
+```
+
+```{r}
+bootstrap_parallel <- function(my_vec, my_func, B){
+  ###
+  # This function takes in a data vector, function, and the number of bootstrap
+  # iterations and returns a list holding the mean and standard deviation of the 
+  # bootstrap estimates as well, as the vector of the bootstrap estimates. It
+  # utilizes parallel computing.
+  #
+  # Args
+  # ----
+  # my_vec : numeric vector
+  #   A vector of numbers of which to compute the statistic of interest.
+  # my_func : function
+  #   Function which computes the statistic of interest.
+  # B : int
+  #   The number of bootstrapped samples to return.
+  #
+  # Returns
+  # -------
+  # output : list
+  #   A list of the mean, and standard deviation of the estimates and a vector
+  #   of the estimates.
+  #
+  ###
+  
+  # Count the cores and make a cluster from leaving one core free.
+  cores <- detectCores()  
+  cluster <- makeCluster(cores - 1)
+
+  # Create a vector that will be split up and determine the number of bootstrap
+  # samples to get on each core.
+  boot_vec <- 1:B
+  
+  # Export functions to the cluster.
+  clusterExport(
+    cluster, 
+    list("boot_vec", "one_bootstrap", "bootstrap_replicate_par", "my_vec",
+         "my_func"),
+    envir=environment()
+    )
+
+  estimates <- parSapply(
+    cluster,
+    boot_vec,
+    FUN=bootstrap_replicate_par,
+    my_vec=my_vec,
+    my_func=my_func
+    )
+
+  output <- list(
+    'mean' = mean(estimates),
+    'std' = sd(estimates),
+    'estimates' = estimates
+  )
+
+  return(output)
+}
+```
+
+
+# Application to Value at Risk and Expected Shortfall
+
+
+
+
+
+
