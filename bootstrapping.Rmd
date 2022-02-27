@@ -9,6 +9,19 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+# Requirements
+
+- `parallel`: for parallel computation
+- `tidyquant`: for access to financial data
+- `ggplot2`: for data visualization
+
+```{r}
+suppressMessages(library(parallel))
+suppressMessages(library(tidyquant))
+suppressMessages(library(ggplot2))
+```
+
+
 # I. Introduction
 
 # II. Technical Implementation
@@ -117,10 +130,6 @@ bootstrap_replicate <- function(my_vec, my_func, B){
 
 ## D. Parallelized Bootstrapping
 
-```{r}
-library(parallel)
-```
-
 
 ```{r}
 bootstrap_replicate_par <- function(B, my_vec, my_func){
@@ -215,10 +224,10 @@ bootstrap_parallel <- function(my_vec, my_func, B){
 ## A. Sharpe Ratio
 
 ```{r}
-suppressMessages(library(tidyquant))
 
 
-start_date <- '2000-01-01'
+
+start_date <- '2022-01-01'
 end_date <- '2022-02-25'
 
 getSymbols(
@@ -228,7 +237,18 @@ getSymbols(
   warnings=FALSE,
   auto.assign=TRUE
   )
+
+adj_close <- as.vector(GSPC$GSPC.Adjusted)
+trading_days <- length(adj_close)
+returns <- tail(adj_close, trading_days-1) / head(adj_close, trading_days-1) - 1
+
+
 ```
+
+```{r}
+tail(adj_close, trading_days-1)
+```
+
 
 ```{r}
 sharpe_ratio <- function(returns){
