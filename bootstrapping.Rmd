@@ -304,20 +304,53 @@ elapsed <- matrix(c(loop_time, repl_time, par_time), nrow=3, byrow=TRUE)[,3]
 results_df <- as.data.frame(
   list('Method'=labels, 'Mean'=mean_ests, 'SE'=se_ests, 'RunTime'=elapsed)
   )
-results_df
+
+knitr::kable(
+  results_df, 
+  caption='Comparison of Bootstrap Estimeates of Sharpe Ratio'
+  )
+```
+
+```{r, incude=False}
+bootstrap_sharpe_df <- as.data.frame(list('sharpe'=sharpe_est_par$estimates))
+
+df <- trading_days - 2
+quantiles <- -400:400 / 100
+x <- sharpe_est + quantiles*sharpe_est_par$std
+densities <- dt(quantiles, df=df)
+t_dist_df <- as.data.frame(list('x'=x, 'density'=densities))
+
+# Define a Student t distribution with shape (nu) and location (mu)
+# source: https://stackoverflow.com/questions/46848998/superimposing-asymmetric-t-distribution-using-ggplot2
+dt2 <- function(x, mu, nu, df, ncp) {
+  dt((x-mu)/nu, df, ncp) / nu
+}
+
+ggplot(bootstrap_sharpe_df, aes(x=sharpe)) +
+  geom_histogram(
+    aes(y=(..density..)),
+    color='darkblue',
+    fill='lightblue',
+    position = 'identity',
+    bins=30) +
+  stat_function(
+    fun=dt2,
+    args=list(mu=sharpe_est_par$mean, nu=sharpe_est_par$std, df=df),
+    color='red',
+    lwd=1
+    ) +
+  labs(
+    title='Bootstrapped Distribution of Sharpe Ratio',
+    x='returns',
+    y='density'
+    )
+
 ```
 
 ```{r}
-bootstrap_sharpe_df <- as.data.frame(list('sharpe'=sharpe_est_par$estimates))
-df <- trading_days - 2
-ggplot(bootstrap_sharpe_df, aes(x=sharpe)) +
-  geom_histogram(aes(y = after_stat(density)),
-                 color='darkblue',
-                 fill='lightblue',
-                 position = 'identity',
-                 bins=30)
-
+max(densities)
 ```
+
 
 ## B. Value at Risk and Expected Shortfall
 
