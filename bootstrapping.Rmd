@@ -221,14 +221,11 @@ bootstrap_parallel <- function(my_vec, my_func, B){
 
 # Applications
 
-## A. Sharpe Ratio
+## A. Data Set-up
 
-```{r}
-
-
-
-start_date <- '2022-01-01'
-end_date <- '2022-02-25'
+```{r, echo=False}
+start_date <- '2016-01-01'
+end_date <- '2021-12-31'
 
 getSymbols(
   "^GSPC",
@@ -241,13 +238,27 @@ getSymbols(
 adj_close <- as.vector(GSPC$GSPC.Adjusted)
 trading_days <- length(adj_close)
 returns <- tail(adj_close, trading_days-1) / head(adj_close, trading_days-1) - 1
-
-
 ```
 
-```{r}
-tail(adj_close, trading_days-1)
+```{r, include=FALSE}
+# Create a single-column DataFrame of returns for use with ggplot. 
+returns_df <- as.data.frame(returns)
+
+# Create a histogram of daily returns with a KDE overlayed.
+returns_hist <- ggplot(returns_df, aes(x=returns)) +
+  geom_histogram(aes(y = after_stat(density)),
+                 color='darkblue',
+                 fill='lightblue',
+                 position = 'identity',
+                 bins=30) +
+  geom_density(bw=0.0025, color='red', size=1.5) + 
+  labs(title='S&P 500 Daily Returns', x='returns', y='density')
+
+returns_hist
 ```
+
+
+## B. Sharpe Ratio
 
 
 ```{r}
