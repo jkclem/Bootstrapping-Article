@@ -85,7 +85,7 @@ bootstrap_loop <- function(my_vec, my_func, B){
   }
   output <- list(
     'mean' = mean(estimates),
-    'std' = sd(estimates),
+    'se' = sd(estimates),
     'estimates' = estimates
   )
   return(output)
@@ -121,7 +121,7 @@ bootstrap_replicate <- function(my_vec, my_func, B){
   estimates <- replicate(B, one_bootstrap(my_vec, my_func))
   output <- list(
     'mean' = mean(estimates),
-    'std' = sd(estimates),
+    'se' = sd(estimates),
     'estimates' = estimates
   )
   return(output)
@@ -208,9 +208,11 @@ bootstrap_parallel <- function(my_vec, my_func, B){
     my_func=my_func
     )
 
+  stopCluster(cluster)
+
   output <- list(
     'mean' = mean(estimates),
-    'std' = sd(estimates),
+    'se' = sd(estimates),
     'estimates' = estimates
   )
 
@@ -252,7 +254,11 @@ returns_hist <- ggplot(returns_df, aes(x=returns)) +
                  position = 'identity',
                  bins=30) +
   geom_density(bw=0.0025, color='red', size=1.5) + 
-  labs(title='S&P 500 Daily Returns', x='returns', y='density')
+  labs(
+    title=paste0('S&P 500 Daily Returns (', start_date, ' to ', end_date, ')'),
+    x='returns',
+    y='density'
+    )
 
 returns_hist
 ```
@@ -266,6 +272,40 @@ sharpe_ratio <- function(returns){
   return(mean(returns)/sd(returns))
 }
 ```
+
+```{r}
+sharpe_ratio(returns)
+```
+
+```{r}
+set.seed(1)
+B <- 100000
+
+ptm_loop <- proc.time()
+sharpe_est_loop <- bootstrap_loop(returns, sharpe_ratio, B)
+loop_time <- proc.time() - ptm_loop
+
+ptm_repl <- proc.time()
+sharpe_est_repl <- bootstrap_parallel(returns, sharpe_ratio, B)
+repl_time <- proc.time() - ptm_repl
+
+ptm_par <- proc.time()
+sharpe_est_par <- bootstrap_parallel(returns, sharpe_ratio, B)
+par_time <- proc.time() - ptm_par
+```
+
+
+```{r, include=FALSE}
+labels <- c('For Loop', 'Optimized Loop', 'Parallelized')
+mean_ests <- c(sharpe_est_loop$mean, sharpe_est_repl$mean, sharpe_est_par$mean)
+se_ests <- c(sharpe_est_loop$std, sharpe_est_repl$std, sharpe_est_par$std)
+elapsed <- matrix(c(loop_time, repl_time, par_time), nrow=3, byrow=TRUE)[,3]
+results_df <- as.data.frame(
+  list('Method'=labels, 'Mean'=mean_ests, 'SE'=se_ests, 'RunTime'=elapsed)
+  )
+results_df
+```
+
 
 ## B. Value at Risk and Expected Shortfall
 
