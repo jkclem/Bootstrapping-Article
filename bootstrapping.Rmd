@@ -13,14 +13,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # II. Technical Implementation
 
-```{r}
-rand_vec <- rnorm(100, mean=0.05, sd=0.2)
-
-sharpe_ratio <- function(returns){
-  return(mean(returns)/sd(returns))
-}
-```
-
 ## A. Single Bootstrap Function
 
 
@@ -218,7 +210,33 @@ bootstrap_parallel <- function(my_vec, my_func, B){
 ```
 
 
-# Application to Value at Risk and Expected Shortfall
+# Applications
+
+## A. Sharpe Ratio
+
+```{r}
+suppressMessages(library(tidyquant))
+
+
+start_date <- '2000-01-01'
+end_date <- '2022-02-25'
+
+getSymbols(
+  "^GSPC",
+  from=start_date,
+  to=end_date,
+  warnings=FALSE,
+  auto.assign=TRUE
+  )
+```
+
+```{r}
+sharpe_ratio <- function(returns){
+  return(mean(returns)/sd(returns))
+}
+```
+
+## B. Value at Risk and Expected Shortfall
 
 
 
