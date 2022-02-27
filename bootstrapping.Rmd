@@ -337,25 +337,30 @@ ggplot(bootstrap_sharpe_df, aes(x=sharpe)) +
     ) +
   labs(
     title='Bootstrapped Distribution of Sharpe Ratio w/ 95% CI',
-    x='returns',
+    x='Sharpe ratio',
     y='density'
     ) +
   geom_vline(xintercept=sharpe_est_par$mean, linetype='dashed', 
-             color='purple') + 
+             color='purple',
+             size=1) + 
   geom_vline(xintercept=(sharpe_est_par$mean + sharpe_est_par$se 
                          * qt(0.025, df=df)),
              linetype='solid',
-             color='black') +
+             color='black',
+             size=1) +
   geom_vline(xintercept=(sharpe_est_par$mean + sharpe_est_par$se 
                          * qt(0.975, df=df)),
              linetype='solid',
-             color='black') + 
+             color='black',
+             size=1) + 
   geom_vline(xintercept=quantile(sharpe_est_par$estimates, 0.025),
              linetype='dashed',
-             color='red') +
+             color='red',
+             size=1) +
   geom_vline(xintercept=quantile(sharpe_est_par$estimates, 0.975),
              linetype='dashed',
-             color='red')
+             color='red',
+             size=1)
 
 ```
 
@@ -391,15 +396,17 @@ var_hist <- ggplot(var_est_df, aes(x=VaR)) +
                  position = 'identity',
                  bins=30) +
   labs(
-    title='Bootstrapped Estimates of Value at Risk w/ 95% CIs',
-    x='returns',
+    title='5% VaR for $1,000,000 w/ 95% Bootstrapped CIs',
+    x='VaR',
     y='density'
     ) +
-  geom_vline(xintercept=var_est$mean, linetype='dashed') +
+  geom_vline(xintercept=var_est$mean, linetype='dashed', size=1) +
   geom_vline(xintercept=quantile(var_est$estimates, 0.025), linetype='dashed',
-             color='red') +
+             color='red',
+             size=1) +
   geom_vline(xintercept=quantile(var_est$estimates, 0.975), linetype='dashed',
-             color='red')
+             color='red',
+             size=1)
 
 var_hist
 ```
@@ -414,15 +421,17 @@ es_hist <- ggplot(es_est_df, aes(x=ES)) +
                  position = 'identity',
                  bins=30) +
   labs(
-    title='Bootstrapped Estimates of Expected Shortfall w/ 95% CI',
-    x='returns',
+    title='5% Expected Shortfall for $1,000,000 w/ 95% Bootstrapped CIs',
+    x='expected shortfall',
     y='density'
     ) +
-  geom_vline(xintercept=es_est$mean, linetype='dashed') +
+  geom_vline(xintercept=es_est$mean, linetype='dashed', size=1) +
   geom_vline(xintercept=quantile(es_est$estimates, 0.025), linetype='dashed',
-             color='red') +
+             color='red',
+             size=1) +
   geom_vline(xintercept=quantile(es_est$estimates, 0.975), linetype='dashed',
-             color='red')
+             color='red',
+             size=1)
 
 es_hist
 ```
