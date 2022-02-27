@@ -225,9 +225,9 @@ bootstrap_parallel <- function(my_vec, my_func, B){
 
 ## A. Data Set-up
 
-```{r, echo=False}
-start_date <- '2016-01-01'
-end_date <- '2021-12-31'
+```{r echo=FALSE}
+start_date <- '2000-01-01'
+end_date <- '2022-02-26'
 
 getSymbols(
   "^GSPC",
@@ -242,7 +242,7 @@ trading_days <- length(adj_close)
 returns <- tail(adj_close, trading_days-1) / head(adj_close, trading_days-1) - 1
 ```
 
-```{r, include=FALSE}
+```{r include=FALSE}
 # Create a single-column DataFrame of returns for use with ggplot. 
 returns_df <- as.data.frame(returns)
 
@@ -253,7 +253,7 @@ returns_hist <- ggplot(returns_df, aes(x=returns)) +
                  fill='lightblue',
                  position = 'identity',
                  bins=30) +
-  geom_density(bw=0.0025, color='red', size=1.5) + 
+  geom_density(bw=0.0025, color='red', size=1) + 
   labs(
     title=paste0('S&P 500 Daily Returns (', start_date, ' to ', end_date, ')'),
     x='returns',
@@ -280,14 +280,14 @@ sharpe_est
 
 ```{r}
 set.seed(1)
-B <- 100000
+B <- 5000
 
 ptm_loop <- proc.time()
 sharpe_est_loop <- bootstrap_loop(returns, sharpe_ratio, B)
 loop_time <- proc.time() - ptm_loop
 
 ptm_repl <- proc.time()
-sharpe_est_repl <- bootstrap_parallel(returns, sharpe_ratio, B)
+sharpe_est_repl <- bootstrap_replicate(returns, sharpe_ratio, B)
 repl_time <- proc.time() - ptm_repl
 
 ptm_par <- proc.time()
@@ -296,29 +296,25 @@ par_time <- proc.time() - ptm_par
 ```
 
 
-```{r, include=FALSE}
+```{r include=FALSE}
 labels <- c('For Loop', 'Optimized Loop', 'Parallelized')
 mean_ests <- c(sharpe_est_loop$mean, sharpe_est_repl$mean, sharpe_est_par$mean)
-se_ests <- c(sharpe_est_loop$std, sharpe_est_repl$std, sharpe_est_par$std)
+se_ests <- c(sharpe_est_loop$se, sharpe_est_repl$se, sharpe_est_par$se)
 elapsed <- matrix(c(loop_time, repl_time, par_time), nrow=3, byrow=TRUE)[,3]
 results_df <- as.data.frame(
   list('Method'=labels, 'Mean'=mean_ests, 'SE'=se_ests, 'RunTime'=elapsed)
   )
 
 knitr::kable(
-  results_df, 
-  caption='Comparison of Bootstrap Estimeates of Sharpe Ratio'
+  results_df,
+  caption='Comparison of Bootrapped Estimates of Sharpe Ratio'
   )
 ```
 
-```{r, incude=False}
+```{r incude=FALSE}
 bootstrap_sharpe_df <- as.data.frame(list('sharpe'=sharpe_est_par$estimates))
 
 df <- trading_days - 2
-quantiles <- -400:400 / 100
-x <- sharpe_est + quantiles*sharpe_est_par$std
-densities <- dt(quantiles, df=df)
-t_dist_df <- as.data.frame(list('x'=x, 'density'=densities))
 
 # Define a Student t distribution with shape (nu) and location (mu)
 # source: https://stackoverflow.com/questions/46848998/superimposing-asymmetric-t-distribution-using-ggplot2
@@ -335,27 +331,100 @@ ggplot(bootstrap_sharpe_df, aes(x=sharpe)) +
     bins=30) +
   stat_function(
     fun=dt2,
-    args=list(mu=sharpe_est_par$mean, nu=sharpe_est_par$std, df=df),
+    args=list(mu=sharpe_est_par$mean, nu=sharpe_est_par$se, df=df),
     color='red',
     lwd=1
     ) +
   labs(
-    title='Bootstrapped Distribution of Sharpe Ratio',
+    title='Bootstrapped Distribution of Sharpe Ratio w/ 95% CI',
     x='returns',
     y='density'
-    )
+    ) +
+  geom_vline(xintercept=sharpe_est_par$mean, linetype='dashed', 
+             color='purple') + 
+  geom_vline(xintercept=(sharpe_est_par$mean + sharpe_est_par$se 
+                         * qt(0.025, df=df)),
+             linetype='solid',
+             color='black') +
+  geom_vline(xintercept=(sharpe_est_par$mean + sharpe_est_par$se 
+                         * qt(0.975, df=df)),
+             linetype='solid',
+             color='black') + 
+  geom_vline(xintercept=quantile(sharpe_est_par$estimates, 0.025),
+             linetype='dashed',
+             color='red') +
+  geom_vline(xintercept=quantile(sharpe_est_par$estimates, 0.975),
+             linetype='dashed',
+             color='red')
 
 ```
 
-```{r}
-max(densities)
-```
+
 
 
 ## B. Value at Risk and Expected Shortfall
 
+```{r}
+non_parametric_var <- function(returns, prob=0.05, holdings=1000000){
+  return(as.numeric(-holdings*quantile(returns, probs=prob)))
+}
+
+non_parametric_es <- function(returns, prob=0.05, holdings=1000000){
+  below_quantile <- returns < quantile(returns, probs=prob)
+  numer <- sum(returns[below_quantile])
+  denom <- sum(below_quantile)
+  return(holdings * (numer / denom))
+}
+
+var_est <- bootstrap_parallel(returns, non_parametric_var, 100000)
+es_est <- bootstrap_parallel(returns, non_parametric_es, 100000)
+```
 
 
+```{r include=FALSE}
+var_est_df <- as.data.frame(list('VaR'=var_est$estimates))
 
+var_hist <- ggplot(var_est_df, aes(x=VaR)) +
+  geom_histogram(aes(y = after_stat(density)),
+                 color='darkblue',
+                 fill='lightblue',
+                 position = 'identity',
+                 bins=30) +
+  labs(
+    title='Bootstrapped Estimates of Value at Risk w/ 95% CIs',
+    x='returns',
+    y='density'
+    ) +
+  geom_vline(xintercept=var_est$mean, linetype='dashed') +
+  geom_vline(xintercept=quantile(var_est$estimates, 0.025), linetype='dashed',
+             color='red') +
+  geom_vline(xintercept=quantile(var_est$estimates, 0.975), linetype='dashed',
+             color='red')
+
+var_hist
+```
+
+```{r include=FALSE}
+es_est_df <- as.data.frame(list('ES'=es_est$estimates))
+
+es_hist <- ggplot(es_est_df, aes(x=ES)) +
+  geom_histogram(aes(y = after_stat(density)),
+                 color='darkblue',
+                 fill='lightblue',
+                 position = 'identity',
+                 bins=30) +
+  labs(
+    title='Bootstrapped Estimates of Expected Shortfall w/ 95% CI',
+    x='returns',
+    y='density'
+    ) +
+  geom_vline(xintercept=es_est$mean, linetype='dashed') +
+  geom_vline(xintercept=quantile(es_est$estimates, 0.025), linetype='dashed',
+             color='red') +
+  geom_vline(xintercept=quantile(es_est$estimates, 0.975), linetype='dashed',
+             color='red')
+
+es_hist
+```
 
 
