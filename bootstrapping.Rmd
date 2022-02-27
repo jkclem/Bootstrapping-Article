@@ -274,7 +274,8 @@ sharpe_ratio <- function(returns){
 ```
 
 ```{r}
-sharpe_ratio(returns)
+sharpe_est <- sharpe_ratio(returns)
+sharpe_est
 ```
 
 ```{r}
@@ -306,6 +307,17 @@ results_df <- as.data.frame(
 results_df
 ```
 
+```{r}
+bootstrap_sharpe_df <- as.data.frame(list('sharpe'=sharpe_est_par$estimates))
+df <- trading_days - 2
+ggplot(bootstrap_sharpe_df, aes(x=sharpe)) +
+  geom_histogram(aes(y = after_stat(density)),
+                 color='darkblue',
+                 fill='lightblue',
+                 position = 'identity',
+                 bins=30)
+
+```
 
 ## B. Value at Risk and Expected Shortfall
 
