@@ -35,7 +35,7 @@ we have analytical results for the [sampling distributions](https://en.wikipedia
 
 When bootstrapping, we treat our sample as the population. We repeatedly resample the same number of observations as the original sample *with replacement* and calculate the statistic of interst on those samples. We resample with replacement because the samples would not be independent when sampling without replacement. They would also exactly match our original sample, which would not be very helpful. This provides us with a simulated sampling distribution with which we can analyze.
 
-# II. Technical Implementation
+# II. Implementation
 
 While there are libraries like [`bootstrap`](https://cran.r-project.org/web/packages/bootstrap/bootstrap.pdf) that do bootstrapping for us, I find coding lightweight functions a great learning method, even though I use well maintained libraries in practice.
 
@@ -337,7 +337,7 @@ The values are very close, but the estimate of the Sharpe ratio and the CI is sl
 
 The histogram below contains the bootstrapped estimates of the Sharpe Ratio with the approximate CI (solid black lines) and the bootstrapped CI (dashed red line) over-layed. We see the that the bootstrapped CI is not that different than the approximate CI.
 
-```{r incude=FALSE}
+```{r include=FALSE}
 bootstrap_sharpe_df <- as.data.frame(list('sharpe'=sharpe_est_boot$estimates))
 
 ggplot(bootstrap_sharpe_df, aes(x=sharpe)) +
@@ -377,18 +377,29 @@ Now let's look at VaR and ES!
 
 VaR and ES are in depth topics that I can not explore in this article, so I am only giving a basic overview.
 
-VaR($\alpha$) is a measure of risk of an asset or portfolio. If VaR(0.05) is \$10,000, there is a 5% probability that we see a loss of *at least* \$10,000 in a given time period. You can assume a distribution of returns and estimate VaR based on that probabilistic model, or you can use the sample quantile if you have sufficient data. You really want to have enough data points to fully cover the left-tail of the returns distribution if taking this approach, which is the one I am taking.
+VaR($\alpha$) is a measure of risk of an asset or portfolio. If VaR(0.05) is \$10,000, there is a 5% probability that we see a loss of *at least* \$10,000 in a given time period. You can assume a distribution of returns and estimate VaR based on that probabilistic model, or you can use the sample quantile if you have sufficient data. You really want to have enough data points to fully cover the left-tail of the returns distribution if taking this approach, which is the one I am taking. Choosing too small of an $\alpha$ relative to your sample size can lead to large underestimates of risk.
 
 This non-parametric VaR formula is below:
 
 $$\hat{VaR}(\alpha) = -S*\hat{q}(\alpha)$$
 
+where $S$ is the holdings in the asset or portfolio and $\hat{q}(\alpha)$ is the sample quantile at $\alpha$.
+
+ES is related to VaR. It is the expected return conditional that it is in the worst $\alpha$% of cases.
+
+This non-parametric ES formula is below:
+
+$$\hat{ES}(\alpha) = -S*\frac{\Sigma^n_{i=1}R_i * I(R_i < \hat{q}(\alpha))}{\Sigma^n_{i=1} I(R_i < \hat{q}(\alpha))}$$
+where $S$ is the holdings in the asset or portfolio, $R_i$ are returns, $\hat{q}(\alpha)$ is the sample quantile at $\alpha$, and $I$ is an indicator function that is 1 if true and 0 if false.
+
+With that background out of the way, let's apply bootstapping to VaR and ES. I will look at the 10% VaR and ES on a \$1,000,000 portfolio indexed to the S&P 500 for our period interest. Since I am using daily returns, these risk measures apply to a time period of a day.
+
 ```{r}
-non_parametric_var <- function(returns, prob=0.05, holdings=1000000){
+non_parametric_var <- function(returns, prob=0.1, holdings=1000000){
   return(as.numeric(-holdings*quantile(returns, probs=prob)))
 }
 
-non_parametric_es <- function(returns, prob=0.05, holdings=1000000){
+non_parametric_es <- function(returns, prob=0.1, holdings=1000000){
   below_quantile <- returns < quantile(returns, probs=prob)
   numer <- sum(returns[below_quantile])
   denom <- sum(below_quantile)
@@ -399,8 +410,16 @@ var_est <- bootstrap_parallel(returns, non_parametric_var, 100000)
 es_est <- bootstrap_parallel(returns, non_parametric_es, 100000)
 ```
 
-
 ```{r include=FALSE}
+my_var_est <- round(var_est$mean, 2)
+my_var_se <- round(var_est$se, 2)
+my_var_lower <- round(as.numeric(quantile(var_est$estimates, 0.025), 2))
+my_var_upper <- round(as.numeric(quantile(var_est$estimates, 0.975), 2))
+```
+
+The distribution of bootstrapped estimates of VaR(0.1) on our portfolio are below. Our mean estimate of VaR(0.1) is `r my_var_est` with a standard error of `r my_var_se`. The bootstrapped 95% CI is `r my_var_lower` to `r my_var_upper`.
+
+```{r echo=FALSE}
 var_est_df <- as.data.frame(list('VaR'=var_est$estimates))
 
 var_hist <- ggplot(var_est_df, aes(x=VaR)) +
@@ -410,7 +429,7 @@ var_hist <- ggplot(var_est_df, aes(x=VaR)) +
                  position = 'identity',
                  bins=30) +
   labs(
-    title='5% VaR for $1,000,000 w/ 95% Bootstrapped CIs',
+    title='10% VaR for $1,000,000 w/ 95% Bootstrapped CIs',
     x='VaR (USD)',
     y='density'
     ) +
@@ -425,7 +444,18 @@ var_hist <- ggplot(var_est_df, aes(x=VaR)) +
 var_hist
 ```
 
+The histogram is a little lumpy, so perhaps there is not enough data to fill out the left-tail sufficiently. Let's look at ES.
+
 ```{r include=FALSE}
+my_es_est <- round(es_est$mean, 2)
+my_es_se <- round(es_est$se, 2)
+my_es_lower <- round(as.numeric(quantile(es_est$estimates, 0.025), 2))
+my_es_upper <- round(as.numeric(quantile(es_est$estimates, 0.975), 2))
+```
+
+The distribution of bootstrapped estimates of ES(0.1) on our portfolio are below. Our mean estimate of ES(0.1) is `r my_es_est` with a standard error of `r my_es_se`. The bootstrapped 95% CI is `r my_es_lower` to `r my_es_upper`.
+
+```{r echo=FALSE}
 es_est_df <- as.data.frame(list('ES'=es_est$estimates))
 
 es_hist <- ggplot(es_est_df, aes(x=ES)) +
@@ -435,7 +465,7 @@ es_hist <- ggplot(es_est_df, aes(x=ES)) +
                  position = 'identity',
                  bins=30) +
   labs(
-    title='5% Expected Shortfall for $1,000,000 w/ 95% Bootstrapped CIs',
+    title='10% Expected Shortfall for $1,000,000 w/ 95% Bootstrapped CIs',
     x='ES (USD)',
     y='density'
     ) +
@@ -450,4 +480,6 @@ es_hist <- ggplot(es_est_df, aes(x=ES)) +
 es_hist
 ```
 
+Our simulated sampling distribution of ES has a nice approximate bell-curve with a bit of a skew towards the right.
 
+I hope this has clarified what bootstrapping is and how to apply it. Thanks for reading!
