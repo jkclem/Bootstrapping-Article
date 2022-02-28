@@ -24,6 +24,8 @@ suppressMessages(library(ggplot2))
 
 # I. Introduction
 
+When estimating a statistic of interest, we are not only interested in the point-value of that statistic. We also want to quantify our uncertainty about our estimate
+
 # II. Technical Implementation
 
 ## A. Single Bootstrap Function
@@ -268,8 +270,8 @@ returns_hist
 
 
 ```{r}
-sharpe_ratio <- function(returns){
-  return(mean(returns)/sd(returns))
+sharpe_ratio <- function(returns, rf=0.02/365){
+  return(mean(returns - rf)/sd(returns))
 }
 ```
 
@@ -310,6 +312,11 @@ knitr::kable(
   caption='Comparison of Bootrapped Estimates of Sharpe Ratio'
   )
 ```
+
+```{r}
+sqrt((1 + 0.5*(sharpe_est^2)) / (trading_days - 1))
+```
+
 
 ```{r incude=FALSE}
 bootstrap_sharpe_df <- as.data.frame(list('sharpe'=sharpe_est_par$estimates))
