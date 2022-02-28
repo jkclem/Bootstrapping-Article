@@ -30,7 +30,10 @@ suppressMessages(library(ggplot2))
 
 # I. Introduction
 
-When estimating a statistic of interest, we are not only interested in the point-value of that statistic. We also want to quantify our uncertainty about our estimate
+When estimating a statistic of interest, we are not only interested in the point-value of that statistic. We also want to quantify our uncertainty about our estimate. For standard quantities of interest, like the mean or standard deviation,
+we have analytical results for the [sampling distributions](https://en.wikipedia.org/wiki/Sampling_distribution) or can easily use large-sample approximations. Often times, we are interested in quantities where we do not know the sampling distribution and deriving it is difficult, if it is even possible. In these cases, the bootstrap is a valuable tool for quantifying uncertainty.
+
+When bootstrapping, we treat our sample as the population. We repeatedly resample the same number of observations as the original sample *with replacement* and calculate the statistic of interst on those samples. We resample with replacement because the samples would not be independent when sampling without replacement. They would also exactly match our original sample, which would not be very helpful. This provides us with a simulated sampling distribution with which we can analyze.
 
 # II. Technical Implementation
 
@@ -106,7 +109,7 @@ bootstrap_replicate <- function(my_vec, my_func, B){
 
 ## C. Parallelized Bootstrapping
 
-Processing each bootstrapped sample does not depend on the other samples, allowing bootstrapping to be easily parallelized, which is what `bootstrap_parallel` does.
+Processing each bootstrapped sample does not depend on the other samples, as the samples are independent of one another. This allows bootstrapping to be easily parallelized, which is what `bootstrap_parallel` does.
 
 ```{r}
 bootstrap_replicate_par <- function(B, my_vec, my_func){
@@ -197,12 +200,15 @@ bootstrap_parallel <- function(my_vec, my_func, B){
 }
 ```
 
+With our function defined, we can move onto applications
 
-# Applications
+# III. Applications
 
-The data set I am using is the daily returns of the S&P 500 from the beginning of 2000 to the end of last month (January 2022). I lose a day at the very beginning due to calculating returns. I also downloaded the 3-month Treasure interest rates, converting BPS to decimals and converting annual interest rates to daily rates to use for the Sharpe Ratio demonstration.
+To demonstrate bootstrapping, I will apply it to the [Sharpe ratio](), Value at Risk [VaR](https://en.wikipedia.org/wiki/Sharpe_ratio), and Expected Shortfall [ES](https://en.wikipedia.org/wiki/Expected_shortfall), sometimes known as Conditional Value at Risk or CVaR.
 
-## A. Data Set-up
+The data set I am using for this demonstration is the daily returns of the S&P 500 from the beginning of 2000 to the end of January 2022. I lose a day at the very beginning due to calculating returns. I also downloaded the 3-month Treasure interest rates, converting BPS to decimals and converted annual interest rates to daily rates to use for the Sharpe Ratio demonstration.
+
+I am assuming returns are [*iid*](https://en.wikipedia.org/wiki/Independent_and_identically_distributed_random_variables) for simplicity, although this is a dubious assumption due to the possibility of correlations in returns and [volatility clustering](https://en.wikipedia.org/wiki/Volatility_clustering).
 
 Below is a plot of daily returns. We can see daily returns are peaked slightly to the right of 0. The tails are long, with the left-tail a bit longer than the right, meaning there have been bigger losses on the worst days than the biggest gains on the best days, which is common in financial data.
 
@@ -227,7 +233,8 @@ getSymbols(
   from=start_date,
   to=end_date,
   warnings=FALSE,
-  auto.assign=TRUE
+  auto.assign=TRUE,
+  "getSymbols.warning4.0"=FALSE
   )
 adj_close <- as.vector(GSPC$GSPC.Adjusted)
 trading_days <- length(adj_close)
@@ -247,9 +254,9 @@ new_start <- rownames(head(GSPC, 1))
 new_end <- rownames(tail(GSPC, 1))
 ```
 
-```{r include=FALSE}
+```{r echo=FALSE}
 # Create a histogram of daily returns with a KDE overlayed.
-ggplot(GSPC, aes(x=returns)) +
+hist <- ggplot(GSPC, aes(x=returns)) +
   geom_histogram(aes(y = after_stat(density)),
                  color='darkblue',
                  fill='lightblue',
@@ -266,13 +273,15 @@ ggplot(GSPC, aes(x=returns)) +
              linetype='dashed',
              color='black',
              size=1)
+
+hist
 ```
 
-Now let's look at the Sharpe Ratio!
+Now let's look at the Sharpe ratio!
 
 ## B. Sharpe Ratio
 
-The Sharpe Ratio is the expected returns in excess of the risk-free rate-of-return per unit of risk. Risk is measured by the standard deviation of returns.
+The Sharpe ratio is the expected returns in excess of the risk-free rate-of-return per unit of risk. Risk is measured by the standard deviation of returns. We can estimate the Sharpe Ratio with the sample mean of excess returns divided by the standard deviations of the returns.
 
 $$SR = \frac{E[R - r_f]}{\sigma_R}$$
 
@@ -280,9 +289,7 @@ The standard error of the Sharpe Ratio is computed as:
 
 $$\hat{SE}(SR) = \sqrt{\frac{1 + \frac{1}{2}\hat{SR}^2}{n}}$$
 
-We can estimate the Sharpe Ratio with the sample mean of excess returns and standard deviations of the returns.
-
-THe function below is calculates the Sharpe ratio given the returns and risk-free rate.
+The function below is calculates the Sharpe ratio given the returns and risk-free rate.
 
 ```{r}
 sharpe_ratio <- function(returns, rf=GSPC$rf){
@@ -299,7 +306,7 @@ B <- 5000
 sharpe_est_boot <- bootstrap_replicate(GSPC$returns, sharpe_ratio, B)
 ```
 
-Below is a table comparing the estimates for the Sharpe Ratio, and the estimated standard error and 95% Confidence Intervals (CIs). The CIs are only approximate because the ones in the first row rely on the Central Limit Theorem and the second are from the bootstrap estimate quantiles.
+Below is a table comparing the estimates for the Sharpe Ratio, and the estimated standard error and 95% Confidence Intervals (CIs). The CIs are only approximate because the CI in the first row rely on the [Central Limit Theorem](https://en.wikipedia.org/wiki/Central_limit_theorem) and the CI in the second row are from the bootstrap estimates quantiles.
 
 ```{r include=FALSE}
 sharpe_est <- sharpe_ratio(GSPC$returns)
@@ -326,12 +333,12 @@ knitr::kable(
   )
 ```
 
-The values are fairly close, but the lower bound is a little more negative in the bootstrapped estimates.
+The values are very close, but the estimate of the Sharpe ratio and the CI is slightly shifted right for the bootstrapped estimate. This difference is negligible.
 
-The histogram below contains the bootstrapped estimates of the Sharpe Ratio with the approximate CI (solid black lines) and the bootstrapped CI (dashed red line) over-layed. We see the that the bootstrapped CI is a little wider and shifted to the left of the approximate CI.
+The histogram below contains the bootstrapped estimates of the Sharpe Ratio with the approximate CI (solid black lines) and the bootstrapped CI (dashed red line) over-layed. We see the that the bootstrapped CI is not that different than the approximate CI.
 
 ```{r incude=FALSE}
-bootstrap_sharpe_df <- as.data.frame(list('sharpe'=sharpe_est_par$estimates))
+bootstrap_sharpe_df <- as.data.frame(list('sharpe'=sharpe_est_boot$estimates))
 
 ggplot(bootstrap_sharpe_df, aes(x=sharpe)) +
   geom_histogram(
@@ -345,11 +352,11 @@ ggplot(bootstrap_sharpe_df, aes(x=sharpe)) +
     x='Sharpe ratio',
     y='density'
     ) +
-  geom_vline(xintercept=sharpe_lower,
+  geom_vline(xintercept=lower_apprx,
              linetype='solid',
              color='black',
              size=1) +
-  geom_vline(xintercept=sharpe_higher,
+  geom_vline(xintercept=upper_apprx,
              linetype='solid',
              color='black',
              size=1) + 
@@ -364,10 +371,17 @@ ggplot(bootstrap_sharpe_df, aes(x=sharpe)) +
 
 ```
 
-
-
+Now let's look at VaR and ES!
 
 ## B. Value at Risk and Expected Shortfall
+
+VaR and ES are in depth topics that I can not explore in this article, so I am only giving a basic overview.
+
+VaR($\alpha$) is a measure of risk of an asset or portfolio. If VaR(0.05) is \$10,000, there is a 5% probability that we see a loss of *at least* \$10,000 in a given time period. You can assume a distribution of returns and estimate VaR based on that probabilistic model, or you can use the sample quantile if you have sufficient data. You really want to have enough data points to fully cover the left-tail of the returns distribution if taking this approach, which is the one I am taking.
+
+This non-parametric VaR formula is below:
+
+$$\hat{VaR}(\alpha) = -S*\hat{q}(\alpha)$$
 
 ```{r}
 non_parametric_var <- function(returns, prob=0.05, holdings=1000000){
@@ -378,7 +392,7 @@ non_parametric_es <- function(returns, prob=0.05, holdings=1000000){
   below_quantile <- returns < quantile(returns, probs=prob)
   numer <- sum(returns[below_quantile])
   denom <- sum(below_quantile)
-  return(holdings * (numer / denom))
+  return(-holdings * (numer / denom))
 }
 
 var_est <- bootstrap_parallel(returns, non_parametric_var, 100000)
@@ -397,7 +411,7 @@ var_hist <- ggplot(var_est_df, aes(x=VaR)) +
                  bins=30) +
   labs(
     title='5% VaR for $1,000,000 w/ 95% Bootstrapped CIs',
-    x='VaR',
+    x='VaR (USD)',
     y='density'
     ) +
   geom_vline(xintercept=var_est$mean, linetype='dashed', size=1) +
@@ -422,7 +436,7 @@ es_hist <- ggplot(es_est_df, aes(x=ES)) +
                  bins=30) +
   labs(
     title='5% Expected Shortfall for $1,000,000 w/ 95% Bootstrapped CIs',
-    x='expected shortfall',
+    x='ES (USD)',
     y='density'
     ) +
   geom_vline(xintercept=es_est$mean, linetype='dashed', size=1) +
