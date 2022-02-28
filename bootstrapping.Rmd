@@ -33,7 +33,7 @@ suppressMessages(library(ggplot2))
 When estimating a statistic of interest, we are not only interested in the point-value of that statistic. We also want to quantify our uncertainty about our estimate. For standard quantities of interest, like the mean or standard deviation,
 we have analytical results for the [sampling distributions](https://en.wikipedia.org/wiki/Sampling_distribution) or can easily use large-sample approximations. Often times, we are interested in quantities where we do not know the sampling distribution and deriving it is difficult, if it is even possible. In these cases, the bootstrap is a valuable tool for quantifying uncertainty.
 
-When bootstrapping, we treat our sample as the population. We repeatedly resample the same number of observations as the original sample *with replacement* and calculate the statistic of interst on those samples. We resample with replacement because the samples would not be independent when sampling without replacement. They would also exactly match our original sample, which would not be very helpful. This provides us with a simulated sampling distribution with which we can analyze.
+When bootstrapping, we treat our sample as the population. We repeatedly resample the same number of observations as the original sample *with replacement* and calculate the statistic of interest on those samples. We resample with replacement because the samples would not be independent when sampling without replacement. They would also exactly match our original sample, which would not be very helpful. This provides us with a simulated sampling distribution with which we can analyze.
 
 # II. Implementation
 
@@ -71,7 +71,7 @@ one_bootstrap <- function(my_vec, my_func){
 
 ## B. Bootstrapping using Looping
 
-The function `bootstrap_replicate` takes in a data vector, function, and the number of bootstrap iterations to perform, **B** and returns a list with the mean, standard error, and estimates themselves. It does this by calling `one_bootstrap` **B** times. R's `replicate` function performs loops in a faster manner than explicitly writing a for loop.
+The function `bootstrap_replicate` takes in a data vector, function, and the number of bootstrap iterations to perform, **B**, and returns a list with the mean, standard error, and estimates themselves. It does this by calling `one_bootstrap` **B** times. R's `replicate` function performs loops in a faster manner than explicitly writing a for loop.
 
 ```{r}
 bootstrap_replicate <- function(my_vec, my_func, B){
@@ -200,11 +200,11 @@ bootstrap_parallel <- function(my_vec, my_func, B){
 }
 ```
 
-With our function defined, we can move onto applications
+With our functions defined, we can move onto applications
 
 # III. Applications
 
-To demonstrate bootstrapping, I will apply it to the [Sharpe ratio](), Value at Risk [VaR](https://en.wikipedia.org/wiki/Sharpe_ratio), and Expected Shortfall [ES](https://en.wikipedia.org/wiki/Expected_shortfall), sometimes known as Conditional Value at Risk or CVaR.
+To demonstrate bootstrapping, I will apply it to the [Sharpe ratio](https://en.wikipedia.org/wiki/Sharpe_ratio), Value at Risk [VaR](https://en.wikipedia.org/wiki/Sharpe_ratio), and Expected Shortfall [ES](https://en.wikipedia.org/wiki/Expected_shortfall), sometimes known as Conditional Value at Risk or CVaR.
 
 The data set I am using for this demonstration is the daily returns of the S&P 500 from the beginning of 2000 to the end of January 2022. I lose a day at the very beginning due to calculating returns. I also downloaded the 3-month Treasure interest rates, converting BPS to decimals and converted annual interest rates to daily rates to use for the Sharpe Ratio demonstration.
 
@@ -308,7 +308,7 @@ sharpe_est_boot <- bootstrap_replicate(GSPC$returns, sharpe_ratio, B)
 
 Below is a table comparing the estimates for the Sharpe Ratio, and the estimated standard error and 95% Confidence Intervals (CIs). The CIs are only approximate because the CI in the first row rely on the [Central Limit Theorem](https://en.wikipedia.org/wiki/Central_limit_theorem) and the CI in the second row are from the bootstrap estimates quantiles.
 
-```{r include=FALSE}
+```{r echo=FALSE}
 sharpe_est <- sharpe_ratio(GSPC$returns)
 sharpe_se <- sqrt((1+0.5*(sharpe_est^2))/nrow(GSPC))
 lower_apprx <- as.numeric(sharpe_est + qnorm(0.025)*sharpe_se)
@@ -337,7 +337,7 @@ The values are very close, but the estimate of the Sharpe ratio and the CI is sl
 
 The histogram below contains the bootstrapped estimates of the Sharpe Ratio with the approximate CI (solid black lines) and the bootstrapped CI (dashed red line) over-layed. We see the that the bootstrapped CI is not that different than the approximate CI.
 
-```{r include=FALSE}
+```{r echo=FALSE}
 bootstrap_sharpe_df <- as.data.frame(list('sharpe'=sharpe_est_boot$estimates))
 
 ggplot(bootstrap_sharpe_df, aes(x=sharpe)) +
